@@ -1,0 +1,973 @@
+import tkinter as tk
+from tkinter import messagebox
+from datetime import datetime, timedelta
+
+try:
+    import pygame
+    PYGAME_AVAILABLE = True
+except ImportError:
+    PYGAME_AVAILABLE = False
+
+
+class TaskApp(tk.Tk):
+    def __init__(self):
+        super().__init__()
+
+        self.title("Task Dashboard")
+        self.geometry("850x900")
+        self.configure(bg="#eaf4ff")
+
+        self.today = datetime.now()
+
+        if PYGAME_AVAILABLE:
+            try:
+                pygame.mixer.init()
+            except:
+                pass
+
+        # Home tasks
+        self.today_tasks = [
+            {"title": "Finish homework", "time": "4:00 PM", "date": self.today.strftime("%B %d, %Y")},
+            {"title": "Review biology notes", "time": "6:30 PM", "date": self.today.strftime("%B %d, %Y")},
+            {"title": "Workout", "time": "8:00 PM", "date": self.today.strftime("%B %d, %Y")},
+        ]
+
+        self.upcoming_week_tasks = [
+            {"title": "Math quiz review", "time": "5:00 PM", "date": (self.today + timedelta(days=1)).strftime("%B %d, %Y")},
+            {"title": "Science project meeting", "time": "3:30 PM", "date": (self.today + timedelta(days=2)).strftime("%B %d, %Y")},
+            {"title": "Submit English essay", "time": "11:59 PM", "date": (self.today + timedelta(days=3)).strftime("%B %d, %Y")},
+        ]
+
+        # Shared task sorter data
+        self.sorted_tasks = []
+
+        self.frames = {}
+        container = tk.Frame(self, bg="#eaf4ff")
+        container.pack(fill="both", expand=True)
+
+        for F in (MainPage, PageOne, PageTwo):
+            frame = F(container, self)
+            self.frames[F] = frame
+            self.frames[F] = frame
+            frame.place(relwidth=1, relheight=1)
+
+        self.show_frame(MainPage)
+
+    def show_frame(self, page_class):
+        self.frames[page_class].refresh_page()
+        self.frames[page_class].tkraise()
+
+    def add_sorted_task(self, title, due_date_str, difficulty):
+        score = self.calculate_task_score(due_date_str, difficulty)
+
+        task = {
+            "title": title,
+            "due_date": due_date_str,
+            "difficulty": difficulty,
+            "score": score
+        }
+
+        self.sorted_tasks.append(task)
+        self.sort_tasks()
+
+        # refresh both home and page 2 automatically
+        self.frames[MainPage].refresh_page()
+        self.frames[PageTwo].refresh_page()
+
+    def sort_tasks(self):
+        for task in self.sorted_tasks:
+            task["score"] = self.calculate_task_score(task["due_date"], task["difficulty"])
+
+        self.sorted_tasks.sort(key=lambda x: x["score"], reverse=True)
+
+    def calculate_task_score(self, due_date_str, difficulty):
+        difficulty_map = {
+            "Easy": 1,
+            "Medium": 2,
+            "Hard": 3
+        }
+
+        try:
+            due_date = datetime.strptime(due_date_str, "%Y-%m-%d")
+            now = datetime.now()
+            time_left = (due_date - now).total_seconds() / 3600  # hours
+
+            if time_left <= 0:
+                urgency_score = 100
+            elif time_left <= 24:
+                urgency_score = 90
+            elif time_left <= 48:
+                urgency_score = 70
+            elif time_left <= 72:
+                urgency_score = 50
+            elif time_left <= 168:
+                urgency_score = 30
+            else:
+                urgency_score = 10
+
+            difficulty_score = difficulty_map[difficulty] * 15
+
+            return urgency_score + difficulty_score
+
+        except:
+            return 0
+
+
+class BubbleFrame(tk.Frame):
+    def __init__(self, parent, bg_color="#ffffff", **kwargs):
+        super().__init__(parent, bg=parent["bg"], **kwargs)
+
+        self.bubble = tk.Frame(self, bg=bg_color, bd=0, highlightthickness=0)
+        self.bubble.pack(padx=20, pady=10, fill="both", expand=True)
+
+
+class MainPage(tk.Frame):
+    def __init__(self, parent, controller):
+        super().__init__(parent, bg="#eaf4ff")
+        self.controller = controller
+        self.week_expanded = False
+
+        self.canvas = tk.Canvas(self, bg="#eaf4ff", highlightthickness=0)
+        scrollbar = tk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
+        self.scrollable_frame = tk.Frame(self.canvas, bg="#eaf4ff")
+
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        )
+
+        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        self.canvas.configure(yscrollcommand=scrollbar.set)
+
+        self.canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        self.canvas.bind_all("<MouseWheel>", lambda event: self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units"))
+
+        self.build_static_ui()
+
+    def build_static_ui(self):
+        title_bubble = BubbleFrame(self.scrollable_frame, bg_color="#ffffff")
+        title_bubble.pack(fill="x", padx=30, pady=(25, 10))
+
+        tk.Label(
+            title_bubble.bubble,
+            text="Task Dashboard",
+            font=("Arial", 24, "bold"),
+            bg="#ffffff",
+            fg="#1c3d5a"
+        ).pack(pady=(20, 8))
+
+        self.date_label = tk.Label(
+            title_bubble.bubble,
+            text="",
+            font=("Arial", 13),
+            bg="#ffffff",
+            fg="#4a6a85"
+        )
+        self.date_label.pack(pady=(0, 20))
+
+        button_frame = tk.Frame(self.scrollable_frame, bg="#eaf4ff")
+        button_frame.pack(pady=10)
+
+        self.make_nav_button(button_frame, "Focus Mode", lambda: self.controller.show_frame(PageOne)).grid(row=0, column=0, padx=15)
+        self.make_nav_button(button_frame, "Task Sorter", lambda: self.controller.show_frame(PageTwo)).grid(row=0, column=1, padx=15)
+
+        self.today_section = BubbleFrame(self.scrollable_frame, bg_color="#ffffff")
+        self.today_section.pack(fill="x", padx=30, pady=15)
+
+        tk.Label(
+            self.today_section.bubble,
+            text="Tasks Today",
+            font=("Arial", 20, "bold"),
+            bg="#ffffff",
+            fg="#1c3d5a"
+        ).pack(pady=(18, 10))
+
+        self.today_tasks_container = tk.Frame(self.today_section.bubble, bg="#ffffff")
+        self.today_tasks_container.pack(fill="x")
+
+        week_section = BubbleFrame(self.scrollable_frame, bg_color="#ffffff")
+        week_section.pack(fill="x", padx=30, pady=15)
+
+        clickable = tk.Frame(week_section.bubble, bg="#cfe6ff", cursor="hand2")
+        clickable.pack(fill="x", padx=20, pady=20)
+
+        tk.Label(
+            clickable,
+            text="Upcoming Tasks This Week",
+            font=("Arial", 19, "bold"),
+            bg="#cfe6ff",
+            fg="#1c3d5a",
+            cursor="hand2"
+        ).pack(pady=(18, 8))
+
+        tk.Label(
+            clickable,
+            text="Click here to show or hide weekly tasks",
+            font=("Arial", 12),
+            bg="#cfe6ff",
+            fg="#4a6a85",
+            cursor="hand2"
+        ).pack(pady=(0, 18))
+
+        clickable.bind("<Button-1>", self.toggle_week_tasks)
+        for widget in clickable.winfo_children():
+            widget.bind("<Button-1>", self.toggle_week_tasks)
+
+        self.week_container = tk.Frame(week_section.bubble, bg="#ffffff")
+
+        self.priority_section = BubbleFrame(self.scrollable_frame, bg_color="#ffffff")
+        self.priority_section.pack(fill="x", padx=30, pady=15)
+
+        tk.Label(
+            self.priority_section.bubble,
+            text="Automatically Sorted Tasks",
+            font=("Arial", 20, "bold"),
+            bg="#ffffff",
+            fg="#1c3d5a"
+        ).pack(pady=(18, 10))
+
+        tk.Label(
+            self.priority_section.bubble,
+            text="These are ranked by urgency and difficulty",
+            font=("Arial", 12),
+            bg="#ffffff",
+            fg="#4a6a85"
+        ).pack(pady=(0, 10))
+
+        self.priority_tasks_container = tk.Frame(self.priority_section.bubble, bg="#ffffff")
+        self.priority_tasks_container.pack(fill="x", pady=(0, 10))
+
+    def make_nav_button(self, parent, text, command):
+        return tk.Button(
+            parent,
+            text=text,
+            command=command,
+            font=("Arial", 12, "bold"),
+            bg="#ffffff",
+            fg="#1c3d5a",
+            activebackground="#d8ecff",
+            activeforeground="#1c3d5a",
+            relief="flat",
+            bd=0,
+            padx=25,
+            pady=15,
+            cursor="hand2"
+        )
+
+    def create_task_bubble(self, parent, task, color):
+        bubble = tk.Frame(parent, bg=color, bd=0, highlightthickness=0)
+        bubble.pack(fill="x", padx=20, pady=10)
+
+        tk.Label(
+            bubble,
+            text=task["title"],
+            font=("Arial", 15, "bold"),
+            bg=color,
+            fg="#17324d"
+        ).pack(pady=(14, 4))
+
+        if "date" in task:
+            tk.Label(
+                bubble,
+                text=f"Date: {task['date']}",
+                font=("Arial", 11),
+                bg=color,
+                fg="#35536b"
+            ).pack()
+
+        if "time" in task:
+            tk.Label(
+                bubble,
+                text=f"Time: {task['time']}",
+                font=("Arial", 11),
+                bg=color,
+                fg="#35536b"
+            ).pack(pady=(0, 14))
+
+    def create_sorted_task_bubble(self, parent, task, rank):
+        bubble = tk.Frame(parent, bg="#eaf7e6", bd=0, highlightthickness=0)
+        bubble.pack(fill="x", padx=20, pady=10)
+
+        tk.Label(
+            bubble,
+            text=f"#{rank} - {task['title']}",
+            font=("Arial", 15, "bold"),
+            bg="#eaf7e6",
+            fg="#17324d"
+        ).pack(pady=(14, 4))
+
+        tk.Label(
+            bubble,
+            text=f"Due: {task['due_date']}",
+            font=("Arial", 11),
+            bg="#eaf7e6",
+            fg="#35536b"
+        ).pack()
+
+        tk.Label(
+            bubble,
+            text=f"Difficulty: {task['difficulty']}",
+            font=("Arial", 11),
+            bg="#eaf7e6",
+            fg="#35536b"
+        ).pack()
+
+        tk.Label(
+            bubble,
+            text=f"Priority Score: {task['score']}",
+            font=("Arial", 11, "bold"),
+            bg="#eaf7e6",
+            fg="#35536b"
+        ).pack(pady=(0, 14))
+
+    def toggle_week_tasks(self, event=None):
+        if not self.week_expanded:
+            self.week_container.pack(fill="x", padx=10, pady=(0, 20))
+            self.refresh_week_tasks()
+            self.week_expanded = True
+        else:
+            self.week_container.pack_forget()
+            self.week_expanded = False
+
+    def refresh_week_tasks(self):
+        for widget in self.week_container.winfo_children():
+            widget.destroy()
+
+        for task in self.controller.upcoming_week_tasks:
+            self.create_task_bubble(self.week_container, task, "#eaf7e6")
+
+    def refresh_page(self):
+        self.date_label.config(text=f"Today: {datetime.now().strftime('%A, %B %d, %Y')}")
+
+        for widget in self.today_tasks_container.winfo_children():
+            widget.destroy()
+
+        for task in self.controller.today_tasks:
+            self.create_task_bubble(self.today_tasks_container, task, "#d8ecff")
+
+        for widget in self.priority_tasks_container.winfo_children():
+            widget.destroy()
+
+        if not self.controller.sorted_tasks:
+            tk.Label(
+                self.priority_tasks_container,
+                text="No sorted tasks yet. Add tasks in the Task Sorter page.",
+                font=("Arial", 12),
+                bg="#ffffff",
+                fg="#4a6a85"
+            ).pack(pady=15)
+        else:
+            for i, task in enumerate(self.controller.sorted_tasks, start=1):
+                self.create_sorted_task_bubble(self.priority_tasks_container, task, i)
+
+        if self.week_expanded:
+            self.refresh_week_tasks()
+
+
+class PageOne(tk.Frame):
+    def __init__(self, parent, controller):
+        super().__init__(parent, bg="#eaf4ff")
+        self.controller = controller
+
+        self.timer_running = False
+        self.current_seconds = 0
+        self.total_seconds = 0
+        self.mode = "Ready"
+        self.cycles_left = 0
+        self.study_minutes = 25
+        self.break_minutes = 5
+        self.total_duration_minutes = 60
+
+        self.selected_sound = tk.StringVar(value="Rain")
+
+        self.sound_files = {
+            "Rain": "rain.mp3",
+            "Forest": "forest.mp3",
+            "Waves": "waves.mp3",
+            "Cafe": "cafe.mp3"
+        }
+
+        canvas = tk.Canvas(self, bg="#eaf4ff", highlightthickness=0)
+        scrollbar = tk.Scrollbar(self, orient="vertical", command=canvas.yview)
+        self.scrollable_frame = tk.Frame(canvas, bg="#eaf4ff")
+
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+
+        canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        canvas.bind_all("<MouseWheel>", lambda event: canvas.yview_scroll(int(-1 * (event.delta / 120)), "units"))
+
+        outer = BubbleFrame(self.scrollable_frame, bg_color="#ffffff")
+        outer.pack(fill="x", padx=40, pady=30)
+
+        tk.Label(
+            outer.bubble,
+            text="Focus Mode",
+            font=("Arial", 26, "bold"),
+            bg="#ffffff",
+            fg="#1c3d5a"
+        ).pack(pady=(25, 10))
+
+        tk.Label(
+            outer.bubble,
+            text="Set your study timer, break timer, total study duration, and ambient sound.",
+            font=("Arial", 12),
+            bg="#ffffff",
+            fg="#4a6a85",
+            wraplength=560,
+            justify="center"
+        ).pack(pady=(0, 20))
+
+        form_box = tk.Frame(outer.bubble, bg="#d8ecff")
+        form_box.pack(fill="x", padx=20, pady=15)
+
+        tk.Label(
+            form_box,
+            text="Study Session Length (minutes)",
+            font=("Arial", 13, "bold"),
+            bg="#d8ecff",
+            fg="#17324d"
+        ).pack(pady=(18, 6))
+
+        self.study_entry = tk.Entry(form_box, font=("Arial", 13), justify="center", width=15)
+        self.study_entry.insert(0, "25")
+        self.study_entry.pack(pady=(0, 14))
+
+        tk.Label(
+            form_box,
+            text="Break Length (minutes)",
+            font=("Arial", 13, "bold"),
+            bg="#d8ecff",
+            fg="#17324d"
+        ).pack(pady=(5, 6))
+
+        self.break_entry = tk.Entry(form_box, font=("Arial", 13), justify="center", width=15)
+        self.break_entry.insert(0, "5")
+        self.break_entry.pack(pady=(0, 14))
+
+        tk.Label(
+            form_box,
+            text="Total Study Duration (minutes)",
+            font=("Arial", 13, "bold"),
+            bg="#d8ecff",
+            fg="#17324d"
+        ).pack(pady=(5, 6))
+
+        self.duration_entry = tk.Entry(form_box, font=("Arial", 13), justify="center", width=15)
+        self.duration_entry.insert(0, "60")
+        self.duration_entry.pack(pady=(0, 18))
+
+        sound_box = tk.Frame(outer.bubble, bg="#eaf7e6")
+        sound_box.pack(fill="x", padx=20, pady=15)
+
+        tk.Label(
+            sound_box,
+            text="Choose Ambient Sound",
+            font=("Arial", 15, "bold"),
+            bg="#eaf7e6",
+            fg="#17324d"
+        ).pack(pady=(18, 12))
+
+        for sound in ["Rain", "Forest", "Waves", "Cafe"]:
+            rb = tk.Radiobutton(
+                sound_box,
+                text=sound,
+                variable=self.selected_sound,
+                value=sound,
+                font=("Arial", 12),
+                bg="#eaf7e6",
+                fg="#17324d",
+                activebackground="#eaf7e6",
+                selectcolor="#ffffff",
+                indicatoron=0,
+                width=20,
+                padx=10,
+                pady=8,
+                relief="flat",
+                cursor="hand2"
+            )
+            rb.pack(pady=5)
+
+        sound_button_frame = tk.Frame(outer.bubble, bg="#ffffff")
+        sound_button_frame.pack(pady=12)
+
+        tk.Button(
+            sound_button_frame,
+            text="Play Sound",
+            command=self.play_selected_sound,
+            font=("Arial", 12, "bold"),
+            bg="#dff3dc",
+            fg="#1c3d5a",
+            relief="flat",
+            bd=0,
+            padx=20,
+            pady=12,
+            cursor="hand2"
+        ).grid(row=0, column=0, padx=10)
+
+        tk.Button(
+            sound_button_frame,
+            text="Stop Sound",
+            command=self.stop_sound,
+            font=("Arial", 12, "bold"),
+            bg="#ffe1e1",
+            fg="#1c3d5a",
+            relief="flat",
+            bd=0,
+            padx=20,
+            pady=12,
+            cursor="hand2"
+        ).grid(row=0, column=1, padx=10)
+
+        timer_box = tk.Frame(outer.bubble, bg="#fff3d8")
+        timer_box.pack(fill="x", padx=20, pady=15)
+
+        tk.Label(
+            timer_box,
+            text="Timer Status",
+            font=("Arial", 18, "bold"),
+            bg="#fff3d8",
+            fg="#17324d"
+        ).pack(pady=(20, 8))
+
+        self.mode_label = tk.Label(
+            timer_box,
+            text="Mode: Ready",
+            font=("Arial", 14, "bold"),
+            bg="#fff3d8",
+            fg="#35536b"
+        )
+        self.mode_label.pack(pady=4)
+
+        self.timer_label = tk.Label(
+            timer_box,
+            text="00:00",
+            font=("Arial", 36, "bold"),
+            bg="#fff3d8",
+            fg="#1c3d5a"
+        )
+        self.timer_label.pack(pady=8)
+
+        self.info_label = tk.Label(
+            timer_box,
+            text="Enter your settings and press Start",
+            font=("Arial", 12),
+            bg="#fff3d8",
+            fg="#4a6a85"
+        )
+        self.info_label.pack(pady=(4, 18))
+
+        button_row = tk.Frame(outer.bubble, bg="#ffffff")
+        button_row.pack(pady=12)
+
+        tk.Button(
+            button_row,
+            text="Start Focus Session",
+            command=self.start_focus_mode,
+            font=("Arial", 12, "bold"),
+            bg="#d8ecff",
+            fg="#1c3d5a",
+            relief="flat",
+            bd=0,
+            padx=20,
+            pady=12,
+            cursor="hand2"
+        ).grid(row=0, column=0, padx=10)
+
+        tk.Button(
+            button_row,
+            text="Reset Timer",
+            command=self.reset_timer,
+            font=("Arial", 12, "bold"),
+            bg="#f3e2ff",
+            fg="#1c3d5a",
+            relief="flat",
+            bd=0,
+            padx=20,
+            pady=12,
+            cursor="hand2"
+        ).grid(row=0, column=1, padx=10)
+
+        tk.Button(
+            outer.bubble,
+            text="Back to Main Page",
+            command=lambda: controller.show_frame(MainPage),
+            font=("Arial", 12, "bold"),
+            bg="#d8ecff",
+            fg="#1c3d5a",
+            relief="flat",
+            bd=0,
+            padx=25,
+            pady=12,
+            cursor="hand2"
+        ).pack(pady=(8, 30))
+
+    def play_selected_sound(self):
+        if not PYGAME_AVAILABLE:
+            self.info_label.config(text="pygame is not installed. Run: pip install pygame")
+            return
+
+        try:
+            sound_file = self.sound_files[self.selected_sound.get()]
+            pygame.mixer.music.load(sound_file)
+            pygame.mixer.music.play(-1)
+            self.info_label.config(text=f"Playing: {self.selected_sound.get()}")
+        except Exception:
+            self.info_label.config(text="Could not play sound. Check file names/paths.")
+
+    def stop_sound(self):
+        if PYGAME_AVAILABLE:
+            try:
+                pygame.mixer.music.stop()
+            except:
+                pass
+        self.info_label.config(text="Ambient sound stopped")
+
+    def start_focus_mode(self):
+        if self.timer_running:
+            return
+
+        try:
+            self.study_minutes = int(self.study_entry.get())
+            self.break_minutes = int(self.break_entry.get())
+            self.total_duration_minutes = int(self.duration_entry.get())
+
+            if self.study_minutes <= 0 or self.break_minutes <= 0 or self.total_duration_minutes <= 0:
+                self.info_label.config(text="Please enter values greater than 0")
+                return
+
+        except ValueError:
+            self.info_label.config(text="Please enter valid whole numbers")
+            return
+
+        self.cycles_left = self.total_duration_minutes
+        self.timer_running = True
+        self.play_selected_sound()
+        self.run_study_session()
+
+    def run_study_session(self):
+        if not self.timer_running:
+            return
+
+        if self.cycles_left <= 0:
+            self.finish_focus_mode()
+            return
+
+        current_study = min(self.study_minutes, self.cycles_left)
+        self.mode = "Study"
+        self.current_seconds = current_study * 60
+        self.total_seconds = self.current_seconds
+        self.update_timer_display()
+        self.countdown(self.after_study_session)
+
+    def after_study_session(self):
+        self.cycles_left -= self.study_minutes
+
+        if self.cycles_left <= 0:
+            self.finish_focus_mode()
+            return
+
+        self.mode = "Break"
+        self.current_seconds = self.break_minutes * 60
+        self.total_seconds = self.current_seconds
+        self.update_timer_display()
+        self.countdown(self.after_break_session)
+
+    def after_break_session(self):
+        self.run_study_session()
+
+    def countdown(self, callback):
+        if not self.timer_running:
+            return
+
+        if self.current_seconds > 0:
+            self.update_timer_display()
+            self.current_seconds -= 1
+            self.after(1000, lambda: self.countdown(callback))
+        else:
+            callback()
+
+    def update_timer_display(self):
+        minutes = self.current_seconds // 60
+        seconds = self.current_seconds % 60
+
+        self.mode_label.config(text=f"Mode: {self.mode}")
+        self.timer_label.config(text=f"{minutes:02d}:{seconds:02d}")
+        self.info_label.config(
+            text=f"Selected sound: {self.selected_sound.get()} | Remaining total study time: {max(self.cycles_left, 0)} min"
+        )
+
+    def finish_focus_mode(self):
+        self.timer_running = False
+        self.mode = "Finished"
+        self.mode_label.config(text="Mode: Finished")
+        self.timer_label.config(text="00:00")
+        self.info_label.config(text="Focus session complete")
+        self.stop_sound()
+
+    def reset_timer(self):
+        self.timer_running = False
+        self.current_seconds = 0
+        self.total_seconds = 0
+        self.cycles_left = 0
+        self.mode = "Ready"
+        self.mode_label.config(text="Mode: Ready")
+        self.timer_label.config(text="00:00")
+        self.info_label.config(text="Timer reset")
+        self.stop_sound()
+
+    def refresh_page(self):
+        pass
+
+
+class PageTwo(tk.Frame):
+    def __init__(self, parent, controller):
+        super().__init__(parent, bg="#eaf4ff")
+        self.controller = controller
+
+        canvas = tk.Canvas(self, bg="#eaf4ff", highlightthickness=0)
+        scrollbar = tk.Scrollbar(self, orient="vertical", command=canvas.yview)
+        self.scrollable_frame = tk.Frame(canvas, bg="#eaf4ff")
+
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+
+        canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        canvas.bind_all("<MouseWheel>", lambda event: canvas.yview_scroll(int(-1 * (event.delta / 120)), "units"))
+
+        outer = BubbleFrame(self.scrollable_frame, bg_color="#ffffff")
+        outer.pack(fill="x", padx=40, pady=30)
+
+        tk.Label(
+            outer.bubble,
+            text="Task Sorter",
+            font=("Arial", 26, "bold"),
+            bg="#ffffff",
+            fg="#1c3d5a"
+        ).pack(pady=(25, 10))
+
+        tk.Label(
+            outer.bubble,
+            text="Add tasks, due dates, and difficulty. The app will automatically rank what you should do first.",
+            font=("Arial", 12),
+            bg="#ffffff",
+            fg="#4a6a85",
+            wraplength=620,
+            justify="center"
+        ).pack(pady=(0, 20))
+
+        form_box = tk.Frame(outer.bubble, bg="#d8ecff")
+        form_box.pack(fill="x", padx=20, pady=15)
+
+        tk.Label(
+            form_box,
+            text="Task Name",
+            font=("Arial", 13, "bold"),
+            bg="#d8ecff",
+            fg="#17324d"
+        ).pack(pady=(18, 6))
+
+        self.task_entry = tk.Entry(form_box, font=("Arial", 13), justify="center", width=30)
+        self.task_entry.pack(pady=(0, 14))
+
+        tk.Label(
+            form_box,
+            text="Due Date (YYYY-MM-DD)",
+            font=("Arial", 13, "bold"),
+            bg="#d8ecff",
+            fg="#17324d"
+        ).pack(pady=(5, 6))
+
+        self.due_entry = tk.Entry(form_box, font=("Arial", 13), justify="center", width=30)
+        self.due_entry.insert(0, datetime.now().strftime("%Y-%m-%d"))
+        self.due_entry.pack(pady=(0, 14))
+
+        tk.Label(
+            form_box,
+            text="Difficulty Level",
+            font=("Arial", 13, "bold"),
+            bg="#d8ecff",
+            fg="#17324d"
+        ).pack(pady=(5, 8))
+
+        self.difficulty_var = tk.StringVar(value="Medium")
+
+        difficulty_frame = tk.Frame(form_box, bg="#d8ecff")
+        difficulty_frame.pack(pady=(0, 18))
+
+        for diff in ["Easy", "Medium", "Hard"]:
+            tk.Radiobutton(
+                difficulty_frame,
+                text=diff,
+                variable=self.difficulty_var,
+                value=diff,
+                font=("Arial", 12),
+                bg="#d8ecff",
+                fg="#17324d",
+                activebackground="#d8ecff",
+                selectcolor="#ffffff",
+                indicatoron=0,
+                width=12,
+                padx=10,
+                pady=8,
+                relief="flat",
+                cursor="hand2"
+            ).pack(side="left", padx=8)
+
+        button_row = tk.Frame(outer.bubble, bg="#ffffff")
+        button_row.pack(pady=12)
+
+        tk.Button(
+            button_row,
+            text="Add and Sort Task",
+            command=self.add_task,
+            font=("Arial", 12, "bold"),
+            bg="#dff3dc",
+            fg="#1c3d5a",
+            relief="flat",
+            bd=0,
+            padx=20,
+            pady=12,
+            cursor="hand2"
+        ).grid(row=0, column=0, padx=10)
+
+        tk.Button(
+            button_row,
+            text="Back to Main Page",
+            command=lambda: controller.show_frame(MainPage),
+            font=("Arial", 12, "bold"),
+            bg="#d8ecff",
+            fg="#1c3d5a",
+            relief="flat",
+            bd=0,
+            padx=20,
+            pady=12,
+            cursor="hand2"
+        ).grid(row=0, column=1, padx=10)
+
+        self.status_label = tk.Label(
+            outer.bubble,
+            text="",
+            font=("Arial", 12),
+            bg="#ffffff",
+            fg="#4a6a85"
+        )
+        self.status_label.pack(pady=(4, 15))
+
+        results_box = tk.Frame(outer.bubble, bg="#fff3d8")
+        results_box.pack(fill="x", padx=20, pady=15)
+
+        tk.Label(
+            results_box,
+            text="Sorted Task Priority",
+            font=("Arial", 18, "bold"),
+            bg="#fff3d8",
+            fg="#17324d"
+        ).pack(pady=(20, 8))
+
+        tk.Label(
+            results_box,
+            text="Highest priority appears first",
+            font=("Arial", 12),
+            bg="#fff3d8",
+            fg="#4a6a85"
+        ).pack(pady=(0, 12))
+
+        self.sorted_list_container = tk.Frame(results_box, bg="#fff3d8")
+        self.sorted_list_container.pack(fill="x", pady=(0, 15))
+
+    def add_task(self):
+        title = self.task_entry.get().strip()
+        due_date = self.due_entry.get().strip()
+        difficulty = self.difficulty_var.get()
+
+        if not title:
+            self.status_label.config(text="Please enter a task name")
+            return
+
+        try:
+            datetime.strptime(due_date, "%Y-%m-%d")
+        except ValueError:
+            self.status_label.config(text="Due date must be in YYYY-MM-DD format")
+            return
+
+        self.controller.add_sorted_task(title, due_date, difficulty)
+        self.status_label.config(text=f"Task added: {title}")
+
+        self.task_entry.delete(0, tk.END)
+        self.due_entry.delete(0, tk.END)
+        self.due_entry.insert(0, datetime.now().strftime("%Y-%m-%d"))
+        self.difficulty_var.set("Medium")
+
+    def create_sorted_task_bubble(self, parent, task, rank):
+        bubble = tk.Frame(parent, bg="#ffffff", bd=0, highlightthickness=0)
+        bubble.pack(fill="x", padx=20, pady=10)
+
+        tk.Label(
+            bubble,
+            text=f"#{rank} - {task['title']}",
+            font=("Arial", 14, "bold"),
+            bg="#ffffff",
+            fg="#17324d"
+        ).pack(pady=(14, 4))
+
+        tk.Label(
+            bubble,
+            text=f"Due Date: {task['due_date']}",
+            font=("Arial", 11),
+            bg="#ffffff",
+            fg="#35536b"
+        ).pack()
+
+        tk.Label(
+            bubble,
+            text=f"Difficulty: {task['difficulty']}",
+            font=("Arial", 11),
+            bg="#ffffff",
+            fg="#35536b"
+        ).pack()
+
+        tk.Label(
+            bubble,
+            text=f"Priority Score: {task['score']}",
+            font=("Arial", 11, "bold"),
+            bg="#ffffff",
+            fg="#35536b"
+        ).pack(pady=(0, 14))
+
+    def refresh_page(self):
+        for widget in self.sorted_list_container.winfo_children():
+            widget.destroy()
+
+        if not self.controller.sorted_tasks:
+            tk.Label(
+                self.sorted_list_container,
+                text="No tasks added yet.",
+                font=("Arial", 12),
+                bg="#fff3d8",
+                fg="#4a6a85"
+            ).pack(pady=15)
+        else:
+            for i, task in enumerate(self.controller.sorted_tasks, start=1):
+                self.create_sorted_task_bubble(self.sorted_list_container, task, i)
+
+
+if __name__ == "__main__":
+    app = TaskApp()
+    app.mainloop()
