@@ -140,7 +140,7 @@ export function Dashboard() {
     <div className="min-h-screen bg-[#fff5f5]">
       <div className="max-w-4xl mx-auto px-4 py-6 md:py-8">
         {/* Decorative Header */}
-        <div className="bg-gradient-to-br from-[#e8d4e0] via-[#f0e0eb] to-[#e8d4e0] rounded-3xl shadow-sm p-8 md:p-10 mb-6 relative overflow-hidden border-4 border-[#d4b5c9]">
+        <div className="bg-gradient-to-br from-[#e8d4e0] via-[#f0e0eb] to-[#e8d4e0] rounded-3xl shadow-sm p-6 md:p-10 mb-6 relative overflow-hidden border-4 border-[#d4b5c9]">
           {/* Decorative pattern background */}
           <div className="absolute inset-0 opacity-20" style={{
             backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23b4a0a8' fill-opacity='0.4'%3E%3Cpath d='M30 25c-2.8 0-5-2.2-5-5s2.2-5 5-5 5 2.2 5 5-2.2 5-5 5zm0-2c1.7 0 3-1.3 3-3s-1.3-3-3-3-3 1.3-3 3 1.3 3 3 3z'/%3E%3Cpath d='M15 10l2 2-2 2-2-2 2-2zm30 0l2 2-2 2-2-2 2-2zm-15 35l2 2-2 2-2-2 2-2z'/%3E%3C/g%3E%3C/svg%3E")`,
@@ -148,14 +148,20 @@ export function Dashboard() {
           }}></div>
           
           <div className="relative">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h1 className="text-4xl md:text-5xl font-bold text-[#b4a0a8] mb-2" style={{ fontFamily: 'Georgia, serif', fontStyle: 'italic', letterSpacing: '2px' }}>
+            <div className="flex items-start justify-between gap-4 mb-4">
+              <div className="flex-1 min-w-0">
+                <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-[#b4a0a8] mb-1 sm:mb-2 leading-tight" style={{ fontFamily: 'Georgia, serif', fontStyle: 'italic', letterSpacing: '1px' }}>
                   STU-BALANCE
                 </h1>
-                <p className="text-[#c4b0b8] text-lg" style={{ fontFamily: 'Georgia, serif' }}>Smart Workload Manager</p>
+                <p className="text-[#c4b0b8] text-sm sm:text-base md:text-lg" style={{ fontFamily: 'Georgia, serif' }}>Smart Workload Manager</p>
               </div>
-              <div className="w-16 h-16 rounded-full border-4 border-[#d4b5c9] bg-white/50"></div>
+              <button
+                onClick={() => navigate('/profile')}
+                className="flex-shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-full border-4 border-[#d4b5c9] bg-white/50 hover:bg-white/80 transition-all duration-200 flex items-center justify-center group shadow-sm hover:shadow-md active:scale-95 sm:hover:scale-105"
+                aria-label="Go to Profile"
+              >
+                <User className="w-7 h-7 sm:w-8 sm:h-8 text-[#b4a0a8] group-hover:text-[#9d8a92]" strokeWidth={2} />
+              </button>
             </div>
 
             {/* Fatigue Level Bar */}
@@ -233,25 +239,6 @@ export function Dashboard() {
                 <p className="text-white/80 text-sm">Calendar View</p>
               </div>
               <CalendarDays className="w-16 h-16 text-white/60" strokeWidth={1.5} />
-            </div>
-          </button>
-
-          <button
-            onClick={() => navigate('/profile')}
-            className="bg-gradient-to-br from-[#d4b5c9] to-[#c4a5b9] hover:from-[#c4a5b9] hover:to-[#b495a9] rounded-3xl p-6 shadow-sm transition-all duration-200 text-left relative overflow-hidden"
-          >
-            <div className="absolute inset-0 opacity-10" style={{
-              backgroundImage: `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23fff' fill-opacity='0.4'%3E%3Ccircle cx='5' cy='5' r='2'/%3E%3Ccircle cx='35' cy='35' r='2'/%3E%3C/g%3E%3C/svg%3E")`,
-              backgroundSize: '40px 40px'
-            }}></div>
-            <div className="relative flex items-center justify-between">
-              <div>
-                <h3 className="text-2xl font-bold text-white mb-1" style={{ fontFamily: 'Georgia, serif', fontStyle: 'italic' }}>
-                  Profile
-                </h3>
-                <p className="text-white/80 text-sm">Your Information</p>
-              </div>
-              <User className="w-16 h-16 text-white/60" strokeWidth={1.5} />
             </div>
           </button>
         </div>
