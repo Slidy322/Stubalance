@@ -184,7 +184,7 @@ export function Dashboard() {
         </div>
 
         {/* Navigation Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        <div className="grid grid-cols-2 gap-4 mb-6">
           <button
             onClick={() => navigate('/focus')}
             className="bg-gradient-to-br from-[#d4b5c9] to-[#c4a5b9] hover:from-[#c4a5b9] hover:to-[#b495a9] rounded-3xl p-6 shadow-sm transition-all duration-200 text-left relative overflow-hidden"
@@ -225,7 +225,7 @@ export function Dashboard() {
 
           <button
             onClick={() => navigate('/my-task')}
-            className="bg-gradient-to-br from-[#d4b5c9] to-[#c4a5b9] hover:from-[#c4a5b9] hover:to-[#b495a9] rounded-3xl p-6 shadow-sm transition-all duration-200 text-left relative overflow-hidden"
+            className="bg-gradient-to-br from-[#d4b5c9] to-[#c4a5b9] hover:from-[#c4a5b9] hover:to-[#b495a9] rounded-3xl p-6 shadow-sm transition-all duration-200 text-left relative overflow-hidden col-span-2"
           >
             <div className="absolute inset-0 opacity-10" style={{
               backgroundImage: `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23fff' fill-opacity='0.4'%3E%3Ccircle cx='5' cy='5' r='2'/%3E%3Ccircle cx='35' cy='35' r='2'/%3E%3C/g%3E%3C/svg%3E")`,
