@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { ChevronLeft, User } from 'lucide-react';
-import profileFrameImg from 'figma:asset/9c21346a6853840682e5b435948678a3fea04f12.png';
 
 interface ProfileData {
   name: string;
@@ -150,16 +149,22 @@ export function Profile() {
 
             {/* Decorative frame (profile picture area) */}
             <div className="hidden md:flex items-center justify-center">
-              <div className="relative">
-                <img 
-                  src={profileFrameImg} 
-                  alt="Profile frame" 
-                  className="w-full max-w-sm"
-                />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-48 h-48 rounded-full bg-white/50 flex items-center justify-center">
-                    <User className="w-20 h-20 text-[#c4b0b8]" strokeWidth={1.5} />
+              <div className="relative w-full max-w-sm">
+                {/* Decorative notebook-style profile frame */}
+                <div className="relative aspect-square">
+                  {/* Frame border with notebook aesthetic */}
+                  <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-[#e8d4d9] to-[#f5e6ea] shadow-lg p-6">
+                    {/* Inner border */}
+                    <div className="w-full h-full rounded-2xl bg-white/90 p-4 flex items-center justify-center border-4 border-[#d4b5c9]/30">
+                      {/* Profile icon container */}
+                      <div className="w-40 h-40 rounded-full bg-gradient-to-br from-[#e8d4d9] to-[#f5e6ea] flex items-center justify-center shadow-inner">
+                        <User className="w-20 h-20 text-[#b4a0a8]" strokeWidth={1.5} />
+                      </div>
+                    </div>
                   </div>
+                  {/* Decorative corner elements */}
+                  <div className="absolute -top-2 -left-2 w-8 h-8 rounded-full bg-[#d4b5c9] opacity-60"></div>
+                  <div className="absolute -bottom-2 -right-2 w-6 h-6 rounded-full bg-[#e8d4d9] opacity-60"></div>
                 </div>
               </div>
             </div>
