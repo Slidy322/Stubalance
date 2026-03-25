@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router';
 import { SortedTask } from '../lib/types';
 import { taskStore } from '../lib/taskStore';
 import { Home, Plus, Trash2, Star, Clock, Calendar, TrendingUp } from 'lucide-react';
+import { useAuth } from '../../lib/AuthContext';
 
 type Difficulty = 'Easy' | 'Medium' | 'Hard';
 
 export function TaskSorter() {
   const navigate = useNavigate();
+  const { user, isAuthEnabled } = useAuth();
   const [sortedTasks, setSortedTasks] = useState<SortedTask[]>([]);
   const [taskTitle, setTaskTitle] = useState('');
   const [dueDate, setDueDate] = useState(new Date().toISOString().split('T')[0]);
@@ -16,9 +18,20 @@ export function TaskSorter() {
   const [previewScore, setPreviewScore] = useState(0);
 
   useEffect(() => {
-    const tasks = taskStore.getSortedTasks();
-    setSortedTasks(tasks);
-  }, []);
+    const loadTasks = async () => {
+      if (user && isAuthEnabled) {
+        // Load from cloud
+        const cloudTasks = await taskStore.loadSortedTasksFromCloud();
+        setSortedTasks(cloudTasks);
+      } else {
+        // Load from localStorage
+        const tasks = taskStore.getSortedTasks();
+        setSortedTasks(tasks);
+      }
+    };
+    
+    loadTasks();
+  }, [user, isAuthEnabled]);
 
   // Calculate preview score whenever inputs change
   useEffect(() => {

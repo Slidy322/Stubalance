@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { ChevronLeft, Plus, Calendar, Clock, Star } from 'lucide-react';
+import { ChevronLeft, Plus, Calendar, Clock, Star, Trash2, Check } from 'lucide-react';
 import { Task, SortedTask } from '../lib/types';
 import { taskStore } from '../lib/taskStore';
 
@@ -65,6 +65,37 @@ export function MyTask() {
     }
   };
 
+  const deleteTask = async (taskId: string, taskType: 'today' | 'week' | 'sorted') => {
+    if (!window.confirm('Are you sure you want to delete this task?')) {
+      return;
+    }
+
+    if (taskType === 'today') {
+      const updated = todayTasks.filter(t => t.id !== taskId);
+      setTodayTasks(updated);
+      taskStore.saveTodayTasks(updated);
+    } else if (taskType === 'week') {
+      const updated = weekTasks.filter(t => t.id !== taskId);
+      setWeekTasks(updated);
+      taskStore.saveWeekTasks(updated);
+    } else {
+      const updated = sortedTasks.filter(t => t.id !== taskId);
+      setSortedTasks(updated);
+      await taskStore.saveSortedTasks(updated);
+    }
+  };
+
+  const clearAllTasks = async () => {
+    if (window.confirm('Are you sure you want to delete ALL tasks? This cannot be undone.')) {
+      setTodayTasks([]);
+      setWeekTasks([]);
+      setSortedTasks([]);
+      taskStore.saveTodayTasks([]);
+      taskStore.saveWeekTasks([]);
+      await taskStore.saveSortedTasks([]);
+    }
+  };
+
   const filteredTasks = getFilteredTasks();
 
   return (
@@ -97,7 +128,7 @@ export function MyTask() {
         </div>
 
         {/* Filter Tabs */}
-        <div className="bg-[#c4a5b9] rounded-full p-2 mb-8 shadow-sm">
+        <div className="bg-[#c4a5b9] rounded-full p-2 mb-4 shadow-sm">
           <div className="grid grid-cols-3 gap-2">
             {(['Active', 'All', 'Done'] as FilterType[]).map((filterType) => (
               <button
@@ -115,6 +146,19 @@ export function MyTask() {
             ))}
           </div>
         </div>
+
+        {/* Delete All Button */}
+        {(todayTasks.length > 0 || weekTasks.length > 0 || sortedTasks.length > 0) && (
+          <div className="flex justify-end mb-4">
+            <button
+              onClick={clearAllTasks}
+              className="flex items-center gap-2 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-xl transition-colors duration-200"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span className="text-sm font-semibold">Delete All Tasks</span>
+            </button>
+          </div>
+        )}
 
         {/* Tasks List */}
         <div className="space-y-4">
@@ -141,7 +185,9 @@ export function MyTask() {
                         onClick={() => toggleTaskComplete(task.id, task.type)}
                         className="flex-shrink-0"
                       >
-                        <div className={`w-5 h-5 rounded border-2 border-white ${task.completed ? 'bg-white' : 'bg-transparent'}`} />
+                        <div className={`w-5 h-5 rounded border-2 border-white ${task.completed ? 'bg-white' : 'bg-transparent'} flex items-center justify-center`}>
+                          {task.completed && <Check className="w-4 h-4 text-[#b4a0a8]" strokeWidth={3} />}
+                        </div>
                       </button>
                       <div className="text-white">
                         {isSorted && sortedTask ? (
@@ -179,19 +225,30 @@ export function MyTask() {
                   
                   {/* Body */}
                   <div className="bg-[#e8d4d9] px-5 py-6">
-                    <h3
-                      className={`text-lg font-semibold text-[#7d6b73] mb-2 ${
-                        task.completed ? 'line-through opacity-60' : ''
-                      }`}
-                    >
-                      {task.title}
-                    </h3>
-                    {!isSorted && task.time && (
-                      <p className="text-sm text-[#9d8a92]">
-                        <Clock className="w-3 h-3 inline mr-1" />
-                        {task.time}
-                      </p>
-                    )}
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <h3
+                          className={`text-lg font-semibold text-[#7d6b73] mb-2 ${
+                            task.completed ? 'line-through opacity-60' : ''
+                          }`}
+                        >
+                          {task.title}
+                        </h3>
+                        {!isSorted && task.time && (
+                          <p className="text-sm text-[#9d8a92]">
+                            <Clock className="w-3 h-3 inline mr-1" />
+                            {task.time}
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => deleteTask(task.id, task.type)}
+                        className="flex-shrink-0 w-8 h-8 rounded-full bg-red-100 hover:bg-red-200 flex items-center justify-center text-red-600 transition-colors duration-200"
+                        title="Delete task"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               );

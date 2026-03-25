@@ -1,8 +1,8 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Task, SortedTask } from '../lib/types';
 import { taskStore } from '../lib/taskStore';
-import { Calendar, Clock, Target, ChevronDown, ChevronUp, CheckCircle2, Star, Folder, Sparkles, Trash2, User, CalendarDays, LogIn, LogOut } from 'lucide-react';
+import { Calendar, Clock, ChevronDown, ChevronUp, Star, Folder, Trash2, User, CalendarDays, Check } from 'lucide-react';
 import { useAuth } from '../../lib/AuthContext';
 
 const getDefaultTasks = (): Task[] => {
@@ -77,37 +77,79 @@ export function Dashboard() {
   const [weekTasks, setWeekTasks] = useState<Task[]>([]);
   const [sortedTasks, setSortedTasks] = useState<SortedTask[]>([]);
   const [weekExpanded, setWeekExpanded] = useState(false);
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const profileMenuRef = useRef<HTMLDivElement>(null);
   const { user, isAuthEnabled, signOut } = useAuth();
 
-  useEffect(() => {
-    // Load tasks from storage
-    const today = taskStore.getTodayTasks();
-    const week = taskStore.getWeekTasks();
-    const sorted = taskStore.getSortedTasks();
+  // Helper function to check if a date string is today
+  const isToday = (dateString: string): boolean => {
+    // Get current time in UTC+8
+    const now = new Date();
+    const utc8Now = new Date(now.getTime() + (8 * 60 * 60 * 1000) + (now.getTimezoneOffset() * 60 * 1000));
+    
+    const taskDate = new Date(dateString);
+    return (
+      taskDate.getDate() === utc8Now.getDate() &&
+      taskDate.getMonth() === utc8Now.getMonth() &&
+      taskDate.getFullYear() === utc8Now.getFullYear()
+    );
+  };
 
-    setTodayTasks(today);
-    setWeekTasks(week);
-    setSortedTasks(sorted);
-  }, []);
+  // Helper function to check if a date is within this week (next 7 days, not including today)
+  const isThisWeek = (dateString: string): boolean => {
+    // Get current time in UTC+8
+    const now = new Date();
+    const utc8Now = new Date(now.getTime() + (8 * 60 * 60 * 1000) + (now.getTimezoneOffset() * 60 * 1000));
+    
+    const today = new Date(utc8Now);
+    today.setHours(0, 0, 0, 0);
+    const taskDate = new Date(dateString);
+    taskDate.setHours(0, 0, 0, 0);
+    
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    const nextWeek = new Date(today);
+    nextWeek.setDate(nextWeek.getDate() + 7);
+    
+    return taskDate >= tomorrow && taskDate <= nextWeek;
+  };
 
-  // Close profile menu when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
-        setShowProfileMenu(false);
-      }
+    // Load tasks from storage and filter by date
+    const loadTasksFromStorage = () => {
+      const today = taskStore.getTodayTasks();
+      const week = taskStore.getWeekTasks();
+      const sorted = taskStore.getSortedTasks();
+
+      // Filter today's tasks to only show tasks due today
+      const filteredToday = today.filter(task => isToday(task.date));
+      
+      // Filter week tasks to only show tasks due within the next 7 days (excluding today)
+      const filteredWeek = week.filter(task => isThisWeek(task.date));
+
+      setTodayTasks(filteredToday);
+      setWeekTasks(filteredWeek);
+      setSortedTasks(sorted);
     };
 
-    if (showProfileMenu) {
-      document.addEventListener('mousedown', handleClickOutside);
+    loadTasksFromStorage();
+
+    // If user is logged in, also sync tasks from cloud
+    if (user && isAuthEnabled) {
+      const syncFromCloud = async () => {
+        try {
+          // Load sorted tasks from cloud and save to localStorage
+          const cloudSortedTasks = await taskStore.loadSortedTasksFromCloud();
+          
+          // Reload all tasks from localStorage after cloud sync
+          loadTasksFromStorage();
+        } catch (error) {
+          console.error('Error syncing tasks from cloud:', error);
+        }
+      };
+      
+      syncFromCloud();
     }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showProfileMenu]);
+  }, [user, isAuthEnabled]);
 
   const handleLogout = async () => {
     if (window.confirm('Are you sure you want to log out?')) {
@@ -158,6 +200,17 @@ export function Dashboard() {
     return { text: 'Normal', color: 'bg-green-500', emoji: '🟢' };
   };
 
+  // Recalculate task scores in real-time based on current time
+  const getUpdatedTasksWithScores = (tasks: SortedTask[]): SortedTask[] => {
+    return tasks.map(task => {
+      const newScore = taskStore.calculateTaskScore(task.dueDate, task.dueTime || '', task.difficulty);
+      return { ...task, score: newScore };
+    }).sort((a, b) => b.score - a.score); // Re-sort by updated scores
+  };
+
+  // Get tasks with recalculated scores
+  const sortedTasksWithUpdatedScores = getUpdatedTasksWithScores(sortedTasks);
+
   // Calculate workload level
   const totalTasks = todayTasks.length + sortedTasks.filter(t => !t.completed).length;
   const completedTasks = todayTasks.filter(t => t.completed).length + sortedTasks.filter(t => t.completed).length;
@@ -177,10 +230,11 @@ export function Dashboard() {
 
           {/* Profile Button - Top Right */}
           <button
-            onClick={() => setShowProfileMenu(!showProfileMenu)}
+            onClick={() => navigate('/profile')}
             className="absolute top-4 right-4 md:top-6 md:right-6 w-12 h-12 md:w-14 md:h-14 rounded-full bg-transparent hover:bg-white/20 border-3 border-[#b4a0a8] transition-all duration-200 flex items-center justify-center"
             style={{ borderWidth: '3px' }}
           >
+            <User className="w-6 h-6 md:w-7 md:h-7 text-[#b4a0a8]" />
           </button>
 
           <h1 className="text-4xl md:text-6xl font-bold text-[#b4a0a8] mb-2" style={{ fontFamily: 'Georgia, serif', fontStyle: 'italic', letterSpacing: '2px' }}>
@@ -201,30 +255,6 @@ export function Dashboard() {
               <span>Guest mode - data stored locally</span>
             </div>
           )}
-        </div>
-
-        {/* Fatigue Level */}
-        <div className="bg-white rounded-3xl shadow-sm p-6 md:p-8 mb-6">
-          <div className="flex items-center gap-3 mb-4">
-            <Sparkles className="w-6 h-6 text-[#b4a0a8]" />
-            <h2 className="text-xl font-bold text-[#b4a0a8]" style={{ fontFamily: 'Georgia, serif' }}>
-              Fatigue Level
-            </h2>
-            <span className="ml-auto text-lg font-bold text-[#7d6b73]">{fatigueLevel}%</span>
-          </div>
-          <div className="relative w-full h-6 bg-[#f0e0eb] rounded-full overflow-hidden">
-            <div 
-              className="absolute top-0 left-0 h-full bg-gradient-to-r from-[#b4a0a8] to-[#9d8a92] transition-all duration-500 rounded-full"
-              style={{ width: `${fatigueLevel}%` }}
-            />
-          </div>
-          <p className="text-sm text-[#a89099] mt-3 text-center">
-            {fatigueLevel === 0 ? "No tasks yet! You're well-rested 😊" : 
-             fatigueLevel <= 25 ? "Light workload - you're doing great! 💪" :
-             fatigueLevel <= 50 ? "Moderate workload - stay focused! 📚" :
-             fatigueLevel <= 75 ? "High workload - take breaks! ☕" :
-             "Very high workload - don't forget self-care! 🌟"}
-          </p>
         </div>
 
         {/* Navigation Cards */}
@@ -305,19 +335,10 @@ export function Dashboard() {
 
         {/* Tasks Today */}
         <div className="bg-white rounded-3xl shadow-sm p-6 md:p-8 mb-6">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold text-[#b4a0a8]" style={{ fontFamily: 'Georgia, serif', fontStyle: 'italic' }}>
               Today's Tasks
             </h2>
-            {(todayTasks.length > 0 || weekTasks.length > 0 || sortedTasks.length > 0) && (
-              <button
-                onClick={clearAllTasks}
-                className="flex items-center gap-2 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-xl transition-colors duration-200"
-              >
-                <Trash2 className="w-4 h-4" />
-                <span className="text-sm font-semibold">Clear All</span>
-              </button>
-            )}
           </div>
           <div className="space-y-4">
             {todayTasks.map((task) => (
@@ -332,7 +353,9 @@ export function Dashboard() {
                       onClick={() => toggleTaskComplete(task.id, true)}
                       className="flex-shrink-0"
                     >
-                      <div className={`w-5 h-5 rounded border-2 border-white ${task.completed ? 'bg-white' : 'bg-transparent'}`} />
+                      <div className={`w-5 h-5 rounded border-2 border-white ${task.completed ? 'bg-white' : 'bg-transparent'} flex items-center justify-center`}>
+                        {task.completed && <Check className="w-4 h-4 text-[#b4a0a8]" strokeWidth={3} />}
+                      </div>
                     </button>
                     <div className="text-white">
                       <p className="font-bold text-sm">
@@ -399,7 +422,9 @@ export function Dashboard() {
                           onClick={() => toggleTaskComplete(task.id, false)}
                           className="flex-shrink-0"
                         >
-                          <div className={`w-5 h-5 rounded border-2 border-white ${task.completed ? 'bg-white' : 'bg-transparent'}`} />
+                          <div className={`w-5 h-5 rounded border-2 border-white ${task.completed ? 'bg-white' : 'bg-transparent'} flex items-center justify-center`}>
+                            {task.completed && <Check className="w-4 h-4 text-[#b4a0a8]" strokeWidth={3} />}
+                          </div>
                         </button>
                         <div className="text-white">
                           <p className="font-bold text-sm">{dayName}</p>
@@ -443,13 +468,13 @@ export function Dashboard() {
           </h2>
           <p className="text-sm text-[#a89099] mb-6">Ranked by urgency and difficulty</p>
 
-          {sortedTasks.length === 0 ? (
+          {sortedTasksWithUpdatedScores.length === 0 ? (
             <p className="text-center text-[#a89099] py-8">
               No sorted tasks yet. Add tasks in the Task Sorter page.
             </p>
           ) : (
             <div className="space-y-4">
-              {sortedTasks.map((task, index) => {
+              {sortedTasksWithUpdatedScores.map((task, index) => {
                 const urgency = getUrgencyInfo(task.score);
                 return (
                   <div
@@ -500,24 +525,6 @@ export function Dashboard() {
           )}
         </div>
       </div>
-
-      {/* Profile Menu */}
-      {showProfileMenu && (
-        <div className="absolute top-16 right-4 md:top-18 md:right-6 w-48 bg-white rounded-3xl shadow-lg z-50" ref={profileMenuRef}>
-          <div className="p-4">
-            <p className="text-sm text-[#9d8a92]">Signed in as:</p>
-            <p className="text-sm font-bold text-[#b4a0a8]">{user?.email}</p>
-          </div>
-          <div className="border-t border-[#f0e0eb]"></div>
-          <button
-            onClick={handleLogout}
-            className="w-full text-left px-4 py-2 text-sm text-[#b4a0a8] hover:bg-[#f0e0eb] transition-colors duration-200"
-          >
-            <LogOut className="w-4 h-4 inline mr-2" />
-            Log Out
-          </button>
-        </div>
-      )}
     </div>
   );
 }
