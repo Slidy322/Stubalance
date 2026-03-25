@@ -1,9 +1,11 @@
 import { Task, SortedTask } from './types';
+import { taskAPI, syncHelpers } from '../../lib/supabaseData';
 
 const STORAGE_KEYS = {
   TODAY_TASKS: 'stu-balance-today-tasks',
   WEEK_TASKS: 'stu-balance-week-tasks',
   SORTED_TASKS: 'stu-balance-sorted-tasks',
+  ALL_TASKS: 'stu-balance-tasks',
 };
 
 // Helper function to get data from localStorage
@@ -27,6 +29,82 @@ const saveToStorage = <T,>(key: string, value: T): void => {
 };
 
 export const taskStore = {
+  // Get all tasks (cloud-synced or local)
+  getAllTasks: async (): Promise<Task[]> => {
+    const tasks = await syncHelpers.getMergedTasks();
+    // Also save to localStorage as backup
+    saveToStorage(STORAGE_KEYS.ALL_TASKS, tasks);
+    return tasks;
+  },
+
+  // Add a task (syncs to cloud if authenticated)
+  addTask: async (task: Task): Promise<boolean> => {
+    try {
+      // Try to add to cloud first
+      const cloudTask = await taskAPI.addTask(task);
+      
+      if (cloudTask) {
+        // Success - cloud is source of truth
+        return true;
+      } else {
+        // Not authenticated or failed - use localStorage
+        const tasks = getFromStorage<Task[]>(STORAGE_KEYS.ALL_TASKS, []);
+        tasks.push(task);
+        saveToStorage(STORAGE_KEYS.ALL_TASKS, tasks);
+        return true;
+      }
+    } catch (error) {
+      console.error('Error adding task:', error);
+      return false;
+    }
+  },
+
+  // Update a task (syncs to cloud if authenticated)
+  updateTask: async (id: string, updates: Partial<Task>): Promise<boolean> => {
+    try {
+      // Try to update in cloud first
+      const success = await taskAPI.updateTask(id, updates);
+      
+      if (success) {
+        return true;
+      } else {
+        // Not authenticated or failed - use localStorage
+        const tasks = getFromStorage<Task[]>(STORAGE_KEYS.ALL_TASKS, []);
+        const index = tasks.findIndex(t => t.id === id);
+        if (index !== -1) {
+          tasks[index] = { ...tasks[index], ...updates };
+          saveToStorage(STORAGE_KEYS.ALL_TASKS, tasks);
+          return true;
+        }
+        return false;
+      }
+    } catch (error) {
+      console.error('Error updating task:', error);
+      return false;
+    }
+  },
+
+  // Delete a task (syncs to cloud if authenticated)
+  deleteTask: async (id: string): Promise<boolean> => {
+    try {
+      // Try to delete from cloud first
+      const success = await taskAPI.deleteTask(id);
+      
+      if (success) {
+        return true;
+      } else {
+        // Not authenticated or failed - use localStorage
+        const tasks = getFromStorage<Task[]>(STORAGE_KEYS.ALL_TASKS, []);
+        const filtered = tasks.filter(t => t.id !== id);
+        saveToStorage(STORAGE_KEYS.ALL_TASKS, filtered);
+        return true;
+      }
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      return false;
+    }
+  },
+
   // Today's tasks
   getTodayTasks: (): Task[] => {
     return getFromStorage<Task[]>(STORAGE_KEYS.TODAY_TASKS, []);
@@ -50,8 +128,10 @@ export const taskStore = {
     return getFromStorage<SortedTask[]>(STORAGE_KEYS.SORTED_TASKS, []);
   },
 
-  saveSortedTasks: (tasks: SortedTask[]): void => {
+  saveSortedTasks: async (tasks: SortedTask[]): Promise<void> => {
     saveToStorage(STORAGE_KEYS.SORTED_TASKS, tasks);
+    // Also sync to cloud
+    await taskAPI.updateSortedTasks(tasks);
   },
 
   // Calculate task score

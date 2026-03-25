@@ -3,14 +3,14 @@ import { useNavigate } from 'react-router';
 import { Play, Pause, RotateCcw, Home, Volume2, VolumeX } from 'lucide-react';
 
 type Mode = 'Ready' | 'Study' | 'Break' | 'Finished';
-type Sound = 'Rain' | 'Forest' | 'Waves' | 'Cafe' | 'None';
+type Sound = 'None' | 'Rain' | 'White Noise' | 'Typing';
 
 export function FocusMode() {
   const navigate = useNavigate();
   const [studyMinutes, setStudyMinutes] = useState(25);
   const [breakMinutes, setBreakMinutes] = useState(5);
   const [totalDurationMinutes, setTotalDurationMinutes] = useState(60);
-  const [selectedSound, setSelectedSound] = useState<Sound>('Rain');
+  const [selectedSound, setSelectedSound] = useState<Sound>('None');
   
   const [timerRunning, setTimerRunning] = useState(false);
   const [currentSeconds, setCurrentSeconds] = useState(0);
@@ -222,7 +222,7 @@ export function FocusMode() {
               Choose Ambient Sound
             </h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {(['Rain', 'Forest', 'Waves', 'Cafe', 'None'] as Sound[]).map((sound) => (
+              {(['None', 'Rain', 'White Noise', 'Typing'] as Sound[]).map((sound) => (
                 <button
                   key={sound}
                   onClick={() => setSelectedSound(sound)}

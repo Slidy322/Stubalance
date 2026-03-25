@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { ChevronLeft, User } from 'lucide-react';
+import { ChevronLeft, User, LogOut, LogIn, Cloud, CloudOff } from 'lucide-react';
+import { useAuth } from '../../lib/AuthContext';
+import { profileAPI } from '../../lib/supabaseData';
 
 interface ProfileData {
   name: string;
@@ -11,25 +13,79 @@ interface ProfileData {
 
 export function Profile() {
   const navigate = useNavigate();
+  const { user, signOut, isAuthEnabled } = useAuth();
   const [profileData, setProfileData] = useState<ProfileData>({
     name: '',
     gradeLevel: '',
     school: '',
     email: '',
   });
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [lastSynced, setLastSynced] = useState<Date | null>(null);
 
   useEffect(() => {
-    // Load profile data from localStorage
-    const saved = localStorage.getItem('stu-balance-profile');
-    if (saved) {
-      setProfileData(JSON.parse(saved));
-    }
-  }, []);
+    loadProfile();
+  }, [user]);
 
-  const handleChange = (field: keyof ProfileData, value: string) => {
+  const loadProfile = async () => {
+    if (user && isAuthEnabled) {
+      // Load from cloud
+      setSyncing(true);
+      const cloudProfile = await profileAPI.getProfile();
+      setSyncing(false);
+      
+      if (cloudProfile) {
+        setProfileData(cloudProfile);
+        setLastSynced(new Date());
+        // Also save to localStorage as backup
+        localStorage.setItem('stu-balance-profile', JSON.stringify(cloudProfile));
+      } else {
+        // No cloud profile, try localStorage
+        const saved = localStorage.getItem('stu-balance-profile');
+        if (saved) {
+          setProfileData(JSON.parse(saved));
+        }
+      }
+    } else {
+      // Guest mode - load from localStorage only
+      const saved = localStorage.getItem('stu-balance-profile');
+      if (saved) {
+        setProfileData(JSON.parse(saved));
+      }
+    }
+    
+    // If user is logged in, pre-fill email from auth
+    if (user?.email && !profileData.email) {
+      setProfileData(prev => ({ ...prev, email: user.email || '' }));
+    }
+  };
+
+  const handleChange = async (field: keyof ProfileData, value: string) => {
     const updated = { ...profileData, [field]: value };
     setProfileData(updated);
+    
+    // Save to localStorage immediately
     localStorage.setItem('stu-balance-profile', JSON.stringify(updated));
+    
+    // Sync to cloud if authenticated
+    if (user && isAuthEnabled) {
+      setSyncing(true);
+      const success = await profileAPI.saveProfile(updated);
+      setSyncing(false);
+      
+      if (success) {
+        setLastSynced(new Date());
+      }
+    }
+  };
+
+  const handleLogout = async () => {
+    if (window.confirm('Are you sure you want to log out?')) {
+      setLoggingOut(true);
+      await signOut();
+      navigate('/login');
+    }
   };
 
   return (
@@ -51,21 +107,39 @@ export function Profile() {
 
       <div className="max-w-4xl mx-auto px-4 py-6 md:py-8">
         {/* Header */}
-        <div className="flex items-center mb-8">
+        <div className="flex items-center mb-8 justify-between">
           <button
             onClick={() => navigate('/')}
             className="w-12 h-12 rounded-full bg-[#c4a5b9] hover:bg-[#b495a9] flex items-center justify-center text-white transition-colors duration-200 shadow-sm"
           >
             <ChevronLeft className="w-6 h-6" />
           </button>
-          <div className="flex-1 text-right">
+          <div className="flex-1 text-center mx-4">
             <h1 className="text-4xl md:text-5xl font-bold text-[#b4a0a8]" style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic' }}>
               Profile
             </h1>
             <p className="text-[#c4b0b8] text-sm" style={{ fontFamily: 'Georgia, serif' }}>
-              Your information
+              {user ? `Logged in as ${user.email}` : 'Your information'}
             </p>
           </div>
+          {user ? (
+            <button
+              onClick={handleLogout}
+              disabled={loggingOut}
+              className="w-12 h-12 rounded-full bg-red-400 hover:bg-red-500 disabled:bg-red-300 flex items-center justify-center text-white transition-colors duration-200 shadow-sm"
+              title="Logout"
+            >
+              <LogOut className="w-6 h-6" />
+            </button>
+          ) : (
+            <button
+              onClick={() => navigate('/login')}
+              className="w-12 h-12 rounded-full bg-[#c4a5b9] hover:bg-[#b495a9] flex items-center justify-center text-white transition-colors duration-200 shadow-sm"
+              title="Login"
+            >
+              <LogIn className="w-6 h-6" />
+            </button>
+          )}
         </div>
 
         {/* Profile Form */}

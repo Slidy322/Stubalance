@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import { Task, SortedTask } from '../lib/types';
 import { taskStore } from '../lib/taskStore';
-import { Calendar, Clock, Target, ChevronDown, ChevronUp, CheckCircle2, Star, Folder, Sparkles, Trash2, User, CalendarDays } from 'lucide-react';
+import { Calendar, Clock, Target, ChevronDown, ChevronUp, CheckCircle2, Star, Folder, Sparkles, Trash2, User, CalendarDays, LogIn, LogOut } from 'lucide-react';
+import { useAuth } from '../../lib/AuthContext';
 
 const getDefaultTasks = (): Task[] => {
   const today = new Date();
@@ -76,6 +77,9 @@ export function Dashboard() {
   const [weekTasks, setWeekTasks] = useState<Task[]>([]);
   const [sortedTasks, setSortedTasks] = useState<SortedTask[]>([]);
   const [weekExpanded, setWeekExpanded] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+  const { user, isAuthEnabled, signOut } = useAuth();
 
   useEffect(() => {
     // Load tasks from storage
@@ -87,6 +91,30 @@ export function Dashboard() {
     setWeekTasks(week);
     setSortedTasks(sorted);
   }, []);
+
+  // Close profile menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+        setShowProfileMenu(false);
+      }
+    };
+
+    if (showProfileMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showProfileMenu]);
+
+  const handleLogout = async () => {
+    if (window.confirm('Are you sure you want to log out?')) {
+      await signOut();
+      navigate('/login');
+    }
+  };
 
   const toggleTaskComplete = (taskId: string, isToday: boolean) => {
     if (isToday) {
@@ -139,48 +167,64 @@ export function Dashboard() {
   return (
     <div className="min-h-screen bg-[#fff5f5]">
       <div className="max-w-4xl mx-auto px-4 py-6 md:py-8">
-        {/* Decorative Header */}
-        <div className="bg-gradient-to-br from-[#e8d4e0] via-[#f0e0eb] to-[#e8d4e0] rounded-3xl shadow-sm p-6 md:p-10 mb-6 relative overflow-hidden border-4 border-[#d4b5c9]">
-          {/* Decorative pattern background */}
-          <div className="absolute inset-0 opacity-20" style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23b4a0a8' fill-opacity='0.4'%3E%3Cpath d='M30 25c-2.8 0-5-2.2-5-5s2.2-5 5-5 5 2.2 5 5-2.2 5-5 5zm0-2c1.7 0 3-1.3 3-3s-1.3-3-3-3-3 1.3-3 3 1.3 3 3 3z'/%3E%3Cpath d='M15 10l2 2-2 2-2-2 2-2zm30 0l2 2-2 2-2-2 2-2zm-15 35l2 2-2 2-2-2 2-2z'/%3E%3C/g%3E%3C/svg%3E")`,
-            backgroundSize: '60px 60px'
-          }}></div>
-          
-          <div className="relative">
-            <div className="flex items-start justify-between gap-4 mb-4">
-              <div className="flex-1 min-w-0">
-                <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-[#b4a0a8] mb-1 sm:mb-2 leading-tight" style={{ fontFamily: 'Georgia, serif', fontStyle: 'italic', letterSpacing: '1px' }}>
-                  STU-BALANCE
-                </h1>
-                <p className="text-[#c4b0b8] text-sm sm:text-base md:text-lg" style={{ fontFamily: 'Georgia, serif' }}>Smart Workload Manager</p>
-              </div>
-              <button
-                onClick={() => navigate('/profile')}
-                className="flex-shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-full border-4 border-[#d4b5c9] bg-white/50 hover:bg-white/80 transition-all duration-200 flex items-center justify-center group shadow-sm hover:shadow-md active:scale-95 sm:hover:scale-105"
-                aria-label="Go to Profile"
-              >
-                <User className="w-7 h-7 sm:w-8 sm:h-8 text-[#b4a0a8] group-hover:text-[#9d8a92]" strokeWidth={2} />
-              </button>
-            </div>
+        {/* Decorative Header with Profile Button */}
+        <div className="bg-gradient-to-br from-[#e8d4e0] via-[#f0e0eb] to-[#e8d4e0] rounded-3xl shadow-sm p-6 md:p-8 text-center mb-8 border-4 border-[#d4b5c9] relative overflow-hidden">
+          {/* Decorative corner flourishes */}
+          <div className="absolute top-2 left-2 w-6 h-6 border-t-2 border-l-2 border-[#d4b5c9] rounded-tl-2xl opacity-50"></div>
+          <div className="absolute top-2 right-2 w-6 h-6 border-t-2 border-r-2 border-[#d4b5c9] rounded-tr-2xl opacity-50"></div>
+          <div className="absolute bottom-2 left-2 w-6 h-6 border-b-2 border-l-2 border-[#d4b5c9] rounded-bl-2xl opacity-50"></div>
+          <div className="absolute bottom-2 right-2 w-6 h-6 border-b-2 border-r-2 border-[#d4b5c9] rounded-br-2xl opacity-50"></div>
 
-            {/* Fatigue Level Bar */}
-            <div className="mt-6 bg-white/60 rounded-2xl p-4 backdrop-blur-sm">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-[#b4a0a8]" />
-                  <span className="text-[#7d6b73] font-semibold">Workload Level</span>
-                </div>
-                <span className="text-[#b4a0a8] font-bold">{fatigueLevel}%</span>
-              </div>
-              <div className="w-full bg-[#e8d4d9] rounded-full h-4 overflow-hidden">
-                <div 
-                  className="bg-gradient-to-r from-[#b4a0a8] to-[#9d8a92] h-full rounded-full transition-all duration-500"
-                  style={{ width: `${fatigueLevel}%` }}
-                ></div>
-              </div>
+          {/* Profile Button - Top Right */}
+          <button
+            onClick={() => setShowProfileMenu(!showProfileMenu)}
+            className="absolute top-4 right-4 md:top-6 md:right-6 w-12 h-12 md:w-14 md:h-14 rounded-full bg-transparent hover:bg-white/20 border-3 border-[#b4a0a8] transition-all duration-200 flex items-center justify-center"
+            style={{ borderWidth: '3px' }}
+          >
+          </button>
+
+          <h1 className="text-4xl md:text-6xl font-bold text-[#b4a0a8] mb-2" style={{ fontFamily: 'Georgia, serif', fontStyle: 'italic', letterSpacing: '2px' }}>
+            STU-BALANCE
+          </h1>
+          <p className="text-[#c4b0b8] text-lg md:text-xl mb-4" style={{ fontFamily: 'Georgia, serif' }}>Smart Workload Manager</p>
+          
+          {/* Sync Status Indicator */}
+          {user && (
+            <div className="flex items-center justify-center gap-2 text-sm text-[#9d8a92]">
+              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+              <span>Synced to cloud</span>
             </div>
+          )}
+          {!user && isAuthEnabled && (
+            <div className="flex items-center justify-center gap-2 text-sm text-[#9d8a92]">
+              <div className="w-2 h-2 rounded-full bg-amber-500"></div>
+              <span>Guest mode - data stored locally</span>
+            </div>
+          )}
+        </div>
+
+        {/* Fatigue Level */}
+        <div className="bg-white rounded-3xl shadow-sm p-6 md:p-8 mb-6">
+          <div className="flex items-center gap-3 mb-4">
+            <Sparkles className="w-6 h-6 text-[#b4a0a8]" />
+            <h2 className="text-xl font-bold text-[#b4a0a8]" style={{ fontFamily: 'Georgia, serif' }}>
+              Fatigue Level
+            </h2>
+            <span className="ml-auto text-lg font-bold text-[#7d6b73]">{fatigueLevel}%</span>
           </div>
+          <div className="relative w-full h-6 bg-[#f0e0eb] rounded-full overflow-hidden">
+            <div 
+              className="absolute top-0 left-0 h-full bg-gradient-to-r from-[#b4a0a8] to-[#9d8a92] transition-all duration-500 rounded-full"
+              style={{ width: `${fatigueLevel}%` }}
+            />
+          </div>
+          <p className="text-sm text-[#a89099] mt-3 text-center">
+            {fatigueLevel === 0 ? "No tasks yet! You're well-rested 😊" : 
+             fatigueLevel <= 25 ? "Light workload - you're doing great! 💪" :
+             fatigueLevel <= 50 ? "Moderate workload - stay focused! 📚" :
+             fatigueLevel <= 75 ? "High workload - take breaks! ☕" :
+             "Very high workload - don't forget self-care! 🌟"}
+          </p>
         </div>
 
         {/* Navigation Cards */}
@@ -456,6 +500,24 @@ export function Dashboard() {
           )}
         </div>
       </div>
+
+      {/* Profile Menu */}
+      {showProfileMenu && (
+        <div className="absolute top-16 right-4 md:top-18 md:right-6 w-48 bg-white rounded-3xl shadow-lg z-50" ref={profileMenuRef}>
+          <div className="p-4">
+            <p className="text-sm text-[#9d8a92]">Signed in as:</p>
+            <p className="text-sm font-bold text-[#b4a0a8]">{user?.email}</p>
+          </div>
+          <div className="border-t border-[#f0e0eb]"></div>
+          <button
+            onClick={handleLogout}
+            className="w-full text-left px-4 py-2 text-sm text-[#b4a0a8] hover:bg-[#f0e0eb] transition-colors duration-200"
+          >
+            <LogOut className="w-4 h-4 inline mr-2" />
+            Log Out
+          </button>
+        </div>
+      )}
     </div>
   );
 }
