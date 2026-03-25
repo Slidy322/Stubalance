@@ -1,9 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 
-// These will be environment variables in production
-// For now, users need to replace these with their Supabase project credentials
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+// Supabase configuration
+// In production, these should come from environment variables
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://knxxnukmvfbjjfzydaqe.supabase.co';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtueHhudWttdmZiampmenlkYXFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NjI1MTEsImV4cCI6MjA5MDAzODUxMX0.x1OLCgUKkWx1gEQUtbf-OshVz_Nd-Wz3-3uV1MxShL8';
 
 // Check if Supabase is properly configured
 const isSupabaseConfigured = 
