@@ -182,14 +182,14 @@ export function Dashboard() {
     taskStore.saveSortedTasks(updated);
   };
 
-  const clearAllTasks = () => {
+  const clearAllTasks = async () => {
     if (window.confirm('Are you sure you want to delete ALL tasks? This cannot be undone.')) {
       setTodayTasks([]);
       setWeekTasks([]);
       setSortedTasks([]);
       taskStore.saveTodayTasks([]);
       taskStore.saveWeekTasks([]);
-      taskStore.saveSortedTasks([]);
+      await taskStore.saveSortedTasks([]);
     }
   };
 

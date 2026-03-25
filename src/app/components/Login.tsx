@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../../lib/AuthContext';
 import { Mail, Lock, User, LogIn, UserPlus, AlertCircle, Info } from 'lucide-react';
+import { LoadingScreen } from './LoadingScreen';
 
 export function Login() {
   const navigate = useNavigate();
@@ -12,6 +13,7 @@ export function Login() {
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showLoadingScreen, setShowLoadingScreen] = useState(true);
 
   // Redirect to dashboard if already logged in
   useEffect(() => {
@@ -19,6 +21,11 @@ export function Login() {
       navigate('/', { replace: true });
     }
   }, [user, authLoading, navigate]);
+
+  // Show loading screen if still displaying
+  if (showLoadingScreen) {
+    return <LoadingScreen onLoadingComplete={() => setShowLoadingScreen(false)} />;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,20 +61,6 @@ export function Login() {
       setLoading(false);
     }
   };
-
-  // Show loading while checking auth status
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-[#fff5f5] flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-[#d4b5c9] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-[#b4a0a8] font-semibold" style={{ fontFamily: 'Georgia, serif' }}>
-            Loading...
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-[#fff5f5] flex items-center justify-center px-4 py-8">

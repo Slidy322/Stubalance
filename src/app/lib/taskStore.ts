@@ -37,23 +37,22 @@ const calculateTaskScore = (dueDate: string, dueTime: string, difficulty: 'Easy'
   };
 
   try {
-    // Get current time in UTC+8 (Philippines/Singapore/China timezone)
-    const now = new Date();
-    const utc8OffsetMs = 8 * 60 * 60 * 1000; // UTC+8 offset in milliseconds
-    const localOffsetMs = now.getTimezoneOffset() * 60 * 1000; // Local timezone offset
-    const utc8Now = new Date(now.getTime() + utc8OffsetMs + localOffsetMs);
-    
-    // Parse the due date and time in UTC+8
+    // Parse the due date and time
     // dueDate format: "YYYY-MM-DD"
     // dueTime format: "HH:MM" or "HH:MM:SS"
     const [year, month, day] = dueDate.split('-').map(Number);
     const [hours, minutes, seconds = 0] = (dueTime || '23:59').split(':').map(Number);
     
-    // Create due date in UTC+8
-    const due = new Date(year, month - 1, day, hours, minutes, seconds);
+    // Create due date timestamp (interpreted as UTC+8 local time)
+    // First create as UTC, then subtract 8 hours to get the actual UTC timestamp
+    const utc8OffsetMs = 8 * 60 * 60 * 1000;
+    const dueTimeMs = Date.UTC(year, month - 1, day, hours, minutes, seconds) - utc8OffsetMs;
+    
+    // Get current time timestamp (no conversion needed - it's already absolute time)
+    const currentMs = Date.now();
     
     // Calculate time difference in hours
-    const timeLeft = (due.getTime() - utc8Now.getTime()) / (1000 * 60 * 60);
+    const timeLeft = (dueTimeMs - currentMs) / (1000 * 60 * 60);
 
     let urgencyScore = 0;
     if (timeLeft <= 0) {
@@ -279,6 +278,15 @@ export const taskStore = {
       // Get existing cloud tasks
       const cloudTasks = await taskAPI.getTasks();
       const cloudTaskIds = new Set(cloudTasks.map(t => t.id));
+      const localTaskIds = new Set(tasks.map(t => t.id));
+
+      // Delete tasks from cloud that are no longer in local list
+      for (const cloudTask of cloudTasks) {
+        if (!localTaskIds.has(cloudTask.id)) {
+          await taskAPI.deleteTask(cloudTask.id);
+          console.log(`Deleted task ${cloudTask.id} from cloud`);
+        }
+      }
 
       // For each sorted task, either create or update in cloud
       for (const task of tasks) {
